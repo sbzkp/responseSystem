@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>proxy</title>
+    <style>
+        #container{
+            width: 100px;
+            height: 100px;
+            border: 1px solid skyblue;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+</body>
+</html>
+<script>
+    let bucket = new WeakMap();
+  
+    let data = { text: "hello world" };
+    const proxyData = new Proxy(data, {
+        get( target, key ){
+            let targetDataEffectList = bucket.get(target);
+            if ( !targetDataEffectList ) {
+                bucket.set( target, (targetDataEffectList = new Map()) )
+            }
+            let keyDataEffectList = targetDataEffectList.get(key);
+            if (  !keyDataEffectList ) {
+                targetDataEffectList.set( key, ( keyDataEffectList = new Set() ) );
+            }
+            keyDataEffectList.add( setDivInnerhtml );
+
+            return target[key];
+        },
+        set( target, key, newVal ){
+            target[key] = newVal;
+            let targetDataEffectList = bucket.get(target);
+            if ( !targetDataEffectList ) {
+                return;
+            }
+            if (targetDataEffectList) {
+                let keyDataEffectList = targetDataEffectList.get(key) || new Set();
+                    for (const effect of [...keyDataEffectList]) {
+                    effect();
+                }
+            }
+        }
+    })
+    let setDivInnerhtml = ()=>{
+        document.getElementById("container").innerText = proxyData.text
+    }
+    setDivInnerhtml()
+    setTimeout(()=>{
+        proxyData.text = " 你好，世界"
+    },1000)
+</script>
