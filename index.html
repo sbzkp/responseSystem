@@ -20,12 +20,14 @@
 <script>
     let bucket = new WeakMap();
     let activeFn;
+    let effectStack = [];
     let registerEffect = ( fn )=>{
-        activeFn = fn;
+        effectStack.push( fn )
         fn();
+        effectStack.pop(  )
     }
   
-    let data = { text: "hello world" };
+    let data = { text: "hello world", outerText: "初始值" };
     const proxyData = new Proxy(data, {
         get( target, key ){
             let targetDataEffectList = bucket.get(target);
@@ -36,7 +38,10 @@
             if (  !keyDataEffectList ) {
                 targetDataEffectList.set( key, ( keyDataEffectList = new Set() ) );
             }
-            keyDataEffectList.add( activeFn );
+            let currentEffect = effectStack[effectStack.length-1];
+            if (currentEffect) {
+                keyDataEffectList.add( currentEffect );
+            }
 
             return target[key];
         },
@@ -54,12 +59,21 @@
             }
         }
     })
+
     let setDivInnerhtml = ()=>{
-        document.getElementById("container").innerText = proxyData.text
+        console.log("内部副作用")
+        document.getElementById("container").innerText = proxyData.text;
     }
-    registerEffect( setDivInnerhtml )
+
+
+    registerEffect( ()=>{
+        console.log("外部副作用")
+        registerEffect( setDivInnerhtml )
+        let temp = proxyData.outerText;
+    } )
     
     setTimeout(()=>{
-        proxyData.text = " 你好，世界"
+        //本该触发外部副作用，却触发了内部副作用，原因是因为执行内部的时候，将activeFn的值覆盖掉了
+        proxyData.outerText = " 你好，世界"
     },1000)
 </script>
