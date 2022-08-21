@@ -19,6 +19,11 @@
 </html>
 <script>
     let bucket = new WeakMap();
+    let activeFn;
+    let registerEffect = ( fn )=>{
+        activeFn = fn;
+        fn();
+    }
   
     let data = { text: "hello world" };
     const proxyData = new Proxy(data, {
@@ -31,7 +36,7 @@
             if (  !keyDataEffectList ) {
                 targetDataEffectList.set( key, ( keyDataEffectList = new Set() ) );
             }
-            keyDataEffectList.add( setDivInnerhtml );
+            keyDataEffectList.add( activeFn );
 
             return target[key];
         },
@@ -52,7 +57,8 @@
     let setDivInnerhtml = ()=>{
         document.getElementById("container").innerText = proxyData.text
     }
-    setDivInnerhtml()
+    registerEffect( setDivInnerhtml )
+    
     setTimeout(()=>{
         proxyData.text = " 你好，世界"
     },1000)
