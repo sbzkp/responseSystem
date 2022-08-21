@@ -19,15 +19,18 @@
 </html>
 <script>
     let bucket = new WeakMap();
-    let activeFn;
     let effectStack = [];
-    let registerEffect = ( fn )=>{
-        effectStack.push( fn )
-        fn();
-        effectStack.pop(  )
+    let registerEffect  = ( fn)=>{
+        executor = ()=>{
+            effectStack.push( executor )
+            fn()
+            effectStack.pop( )
+        }
+        executor.deps = new Set();
+        executor();
     }
   
-    let data = { text: "hello world", outerText: "初始值" };
+    let data = { text: "hello world", outerText: "初始值", ok: true };
     const proxyData = new Proxy(data, {
         get( target, key ){
             let targetDataEffectList = bucket.get(target);
@@ -41,8 +44,8 @@
             let currentEffect = effectStack[effectStack.length-1];
             if (currentEffect) {
                 keyDataEffectList.add( currentEffect );
+                currentEffect.deps.add( keyDataEffectList )
             }
-
             return target[key];
         },
         set( target, key, newVal ){
@@ -51,29 +54,32 @@
             if ( !targetDataEffectList ) {
                 return;
             }
-            if (targetDataEffectList) {
-                let keyDataEffectList = targetDataEffectList.get(key) || new Set();
-                    for (const effect of [...keyDataEffectList]) {
-                    effect();
+            let keyDataEffectList = targetDataEffectList.get(key) || new Set();
+            for (const effect of [...keyDataEffectList]) {
+                for (const depsList of effect.deps) {
+                    depsList.delete( effect )
                 }
+                effect.deps.clear()
+                effect();
             }
         }
     })
 
     let setDivInnerhtml = ()=>{
-        console.log("内部副作用")
-        document.getElementById("container").innerText = proxyData.text;
+        let text = proxyData.ok ? proxyData.text : "not";
+        document.getElementById("container").innerText = text;
+        console.log("触发了副作用函数")
     }
 
-
-    registerEffect( ()=>{
-        console.log("外部副作用")
-        registerEffect( setDivInnerhtml )
-        let temp = proxyData.outerText;
-    } )
+    registerEffect( setDivInnerhtml )
     
     setTimeout(()=>{
-        //本该触发外部副作用，却触发了内部副作用，原因是因为执行内部的时候，将activeFn的值覆盖掉了
-        proxyData.outerText = " 你好，世界"
+        proxyData.ok =  false;
     },1000)
+
+    setTimeout(()=>{
+        //这个时候不该触发副作用函数的
+        console.log("不该触发副作用函数") 
+        proxyData.text =  true;
+    },2000)
 </script>
